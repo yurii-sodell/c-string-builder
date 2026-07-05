@@ -9,15 +9,17 @@
 
 #define sb_layer_1 1
 #define sb_layer_2 2
-#define sb_layer_3 3
-#define sb_layer_4 4
 
-sb_status check_standard_errors(const string_builder_union* str, int afterMalloc, int deep) {
+typedef struct string_builder_t {
+    char* value;
+    int count;
+} string_builder_t;
+
+sb_status check_standard_errors(const string_builder_t* str, int afterMalloc, int deep) {
     sb_status status = afterMalloc == 1 ? SB_MEMORY_FAULT : SB_IS_NULL;
     if (deep >= sb_layer_1 && str == NULL) return status;
-    if (deep >= sb_layer_2 && str->string_builder_t == NULL) return status;
-    if (deep >= sb_layer_3 && str->string_builder_t->value == NULL) return status;
-    if (deep >= sb_layer_4 && str->string_builder_t->count < 0) return status;
+    if (deep >= sb_layer_2 && str->value == NULL) return status;
+    if (deep >= sb_layer_2 && str->count < 0) return SB_COUNT_IS_CORRUPTED;
     return SB_OK;
 }
 
@@ -41,74 +43,86 @@ void sb_handle_status(sb_status status) {
     }
 }
 
-void sb_free(string_builder_union* sb) {
-    free(sb->string_builder_t->value);
-    free(sb->string_builder_t);
+int sb_legth(const string_builder_t* sb) { return sb->count; };
+
+char* sb_copy_of_string_value(const string_builder_t* sb) {
+    int count = sb->count;
+    char* to_return = malloc(count + 1);
+    char* value = sb->value;
+    for (int i = 0; i < count; i++) {
+        to_return[i] = value[i];
+    }
+    to_return[count] = '\0';
+    return to_return;
+}
+
+void sb_free(string_builder_t* sb) {
+    free(sb->value);
     free(sb);
 }
 
-string_builder_union* sb_allocate_new(const int len) {
-    string_builder_union* new_sb = malloc(sizeof(string_builder_union));
+string_builder_t* sb_allocate_new(const int len) {
+    string_builder_t* new_sb = malloc(sizeof(string_builder_t));
     sb_status status1 = check_standard_errors(new_sb, true_malloc, sb_layer_1);
     if (status1 != SB_OK) return NULL;
 
-    new_sb->string_builder_t = malloc(sizeof(string_builder_t));
+    new_sb = malloc(sizeof(string_builder_t));
     sb_status status2 = check_standard_errors(new_sb, true_malloc, sb_layer_2);
     if (status2 != SB_OK) return NULL;
 
-    new_sb->string_builder_t->value = malloc(len);
-    sb_status status3 = check_standard_errors(new_sb, true_malloc, sb_layer_3);
+    new_sb->value = malloc(len);
+    sb_status status3 = check_standard_errors(new_sb, true_malloc, sb_layer_2);
     if (status3 != SB_OK) return NULL;
 
-    new_sb->string_builder_t->count = len;
+    new_sb->count = len;
 
     return new_sb;
 }
 
-string_builder_union* sb_from_string(const char* initialStr) {
+string_builder_t* sb_from_string(const char* initialStr) {
     int len = strlen(initialStr);
-    string_builder_union* newString = sb_allocate_new(len);
-    if (newString == NULL) return NULL;
+    string_builder_t* to_return = sb_allocate_new(len);
+    if (to_return == NULL) return NULL;
 
-    newString->string_builder_t->count = len;
+    to_return->count = len;
     for (int i = 0; i < len; i++) {
-        newString->string_builder_t->value[i] = initialStr[i];
+        to_return->value[i] = initialStr[i];
     }
-    return newString;
+    return to_return;
 }
 
-string_builder_union* sb_substring(const string_builder_union* sb, const int start, const int end) {
-    sb_status status1 = check_standard_errors(sb, false_malloc, sb_layer_4);
+string_builder_t* sb_substring(const string_builder_t* sb, const int start, const int end) {
+    sb_status status1 = check_standard_errors(sb, false_malloc, sb_layer_2);
     if (status1 != SB_OK) return NULL;
 
-    if (start < 0 || end > sb->string_builder_t->count || end <= start) {
+    if (start < 0 || end > sb->count || end <= start) {
         return sb;
     }
 
     int len = end - start;
-    string_builder_union* toReturn = sb_allocate_new(len);
+    string_builder_t* toReturn = sb_allocate_new(len);
     if (toReturn == NULL) return NULL;
 
     for (int i = 0; i < len; i++) {
-        toReturn->string_builder_t->value[i] = sb->string_builder_t->value[i + start];
+        toReturn->value[i] = sb->value[i + start];
     }
     return toReturn;
 }
 
-string_builder_union* sb_new() { return sb_allocate_new(0); }
+string_builder_t* sb_new() { return sb_allocate_new(0); }
 
-sb_status sb_print(const string_builder_union* sb) {
-    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_4);
+sb_status sb_print(const string_builder_t* sb) {
+    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_2);
     if (status != SB_OK) return status;
-    printf("\n%.*s", sb->string_builder_t->count, sb->string_builder_t->value);
+    printf("\n%.*s", sb->count, sb->value);
     return SB_OK;
 }
 
-sb_status sb_invert(string_builder_union* sb) {
-    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_4);
+sb_status sb_invert(string_builder_t* sb) {
+    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_2);
     if (status != SB_OK) return status;
 
-    int count = sb->string_builder_t->count;
+    int count = sb->count;
 
     char* newVal = malloc(count);
     if (newVal == NULL) {
@@ -118,10 +132,10 @@ sb_status sb_invert(string_builder_union* sb) {
     int b = count;
     int i = 0;
     while (i < count) {
-        newVal[i++] = sb->string_builder_t->value[--b];
+        newVal[i++] = sb->value[--b];
     }
     while (b < count) {
-        sb->string_builder_t->value[b] = newVal[b];
+        sb->value[b] = newVal[b];
         b++;
     }
 
@@ -129,69 +143,69 @@ sb_status sb_invert(string_builder_union* sb) {
     return SB_OK;
 };
 
-sb_status sb_trim(string_builder_union* sb) {
-    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_4);
+sb_status sb_trim(string_builder_t* sb) {
+    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_2);
     if (status != SB_OK) return status;
 
-    int count = sb->string_builder_t->count;
-    char* value = sb->string_builder_t->value;
+    int count = sb->count;
+    char* value = sb->value;
 
     for (int i = 0; i < count; i++) {
         if (value[i] == ' ') {
-            sb->string_builder_t->count--;
+            sb->count--;
             for (int b = i; b < count - 1; b++) {
                 value[b] = value[b + 1];
             }
         }
     }
-    int memory_to_realese = count - sb->string_builder_t->count;
+    int memory_to_realese = count - sb->count;
     if (memory_to_realese > 0) {
-        char* temp = realloc(value, sb->string_builder_t->count);
+        char* temp = realloc(value, sb->count);
         if (temp == NULL) return SB_MEMORY_FAULT;
         value = temp;
     }
     return SB_OK;
 }
 
-sb_status sb_replace_all_chars_with(string_builder_union* sb, const char toReplaceWith) {
-    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_4);
+sb_status sb_replace_all_chars_with(string_builder_t* sb, const char toReplaceWith) {
+    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_2);
     if (status != SB_OK) return status;
 
-    for (int i = 0; i < sb->string_builder_t->count; i++) {
-        sb->string_builder_t->value[i] = toReplaceWith;
+    for (int i = 0; i < sb->count; i++) {
+        sb->value[i] = toReplaceWith;
     }
     return SB_OK;
 }
 
-sb_status sb_replace_value_with(string_builder_union* sb, const char* toReplaceWith) {
-    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_4);
+sb_status sb_replace_value_with(string_builder_t* sb, const char* toReplaceWith) {
+    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_2);
     if (status != SB_OK) return status;
 
     int len = strlen(toReplaceWith);
-    sb->string_builder_t->value = malloc(len);
-    if (sb->string_builder_t->value == NULL) {
+    sb->value = malloc(len);
+    if (sb->value == NULL) {
         return SB_MEMORY_FAULT;
     }
-    sb->string_builder_t->count = len;
+    sb->count = len;
     for (int i = 0; i < len; i++) {
-        sb->string_builder_t->value[i] = toReplaceWith[i];
+        sb->value[i] = toReplaceWith[i];
     }
     return SB_OK;
 }
 
-sb_status sb_insert(string_builder_union* sb, const char* to_insert, const int start_index) {
-    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_4);
+sb_status sb_insert(string_builder_t* sb, const char* to_insert, const int start_index) {
+    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_2);
     if (status != SB_OK) return status;
-    if (start_index < 0 || start_index > sb->string_builder_t->count) return SB_OUT_OF_BOUNDS;
+    if (start_index < 0 || start_index > sb->count) return SB_OUT_OF_BOUNDS;
 
-    int length_initial = sb->string_builder_t->count;
+    int length_initial = sb->count;
     int lenght_to_insert = strlen(to_insert);
     int finalLenght = length_initial + lenght_to_insert;
 
-    char* savedValue = sb->string_builder_t->value;
-    sb->string_builder_t->value = malloc(finalLenght);
-    char* value = sb->string_builder_t->value;
-    if (sb->string_builder_t->value == NULL) return SB_MEMORY_FAULT;
+    char* savedValue = sb->value;
+    sb->value = malloc(finalLenght);
+    char* value = sb->value;
+    if (sb->value == NULL) return SB_MEMORY_FAULT;
 
     int end_insertion_index = start_index + lenght_to_insert;
     int i = 0;
@@ -209,26 +223,26 @@ sb_status sb_insert(string_builder_union* sb, const char* to_insert, const int s
         i++;
     }
 
-    sb->string_builder_t->count = finalLenght;
+    sb->count = finalLenght;
     free(savedValue);
     return SB_OK;
 }
 
-sb_status sb_replace(string_builder_union* sb, const int start, const int end,
+sb_status sb_replace(string_builder_t* sb, const int start, const int end,
                      const char* toReplaceWith) {
-    if (start > end || start < 0 || end > sb->string_builder_t->count) return SB_OUT_OF_BOUNDS;
+    if (start > end || start < 0 || end > sb->count) return SB_OUT_OF_BOUNDS;
 
-    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_4);
+    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_2);
     if (status != SB_OK) return 0;
 
-    int length_initial = sb->string_builder_t->count;                         // 12
-    int lenght_to_insert = strlen(toReplaceWith);                             // 5
-    int length_to_remove = end - start;                                       // 12 - 8 => remove 4
-    int final_lenght = length_initial + lenght_to_insert - length_to_remove;  // 12 + 5 - 4 => 13
+    int length_initial = sb->count;
+    int lenght_to_insert = strlen(toReplaceWith);
+    int length_to_remove = end - start;
+    int final_lenght = length_initial + lenght_to_insert - length_to_remove;
 
-    char* savedValue = sb->string_builder_t->value;
-    sb->string_builder_t->value = malloc(final_lenght);
-    char* value = sb->string_builder_t->value;
+    char* savedValue = sb->value;
+    sb->value = malloc(final_lenght);
+    char* value = sb->value;
     if (value == NULL) return SB_MEMORY_FAULT;
 
     int i = 0;
@@ -247,24 +261,24 @@ sb_status sb_replace(string_builder_union* sb, const int start, const int end,
         i++;
     }
 
-    sb->string_builder_t->count = final_lenght;
+    sb->count = final_lenght;
 
     free(savedValue);
     return SB_OK;
 }
 
-sb_status sb_append(string_builder_union* sb, const char* to_append) {
-    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_4);
+sb_status sb_append(string_builder_t* sb, const char* to_append) {
+    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_2);
     if (status != SB_OK) return status;
 
-    int len_initial = sb->string_builder_t->count;
+    int len_initial = sb->count;
 
     int len_final = strlen(to_append) + len_initial;
-    char* savedValue = sb->string_builder_t->value;
-    sb->string_builder_t->value = malloc(len_final);
-    if (sb->string_builder_t->value == NULL) return SB_MEMORY_FAULT;
+    char* savedValue = sb->value;
+    sb->value = malloc(len_final);
+    if (sb->value == NULL) return SB_MEMORY_FAULT;
 
-    char* value = sb->string_builder_t->value;
+    char* value = sb->value;
 
     for (int i = 0; i < len_final; i++) {
         if (i < len_initial) {
@@ -274,16 +288,16 @@ sb_status sb_append(string_builder_union* sb, const char* to_append) {
         }
     }
 
-    sb->string_builder_t->count = len_final;
+    sb->count = len_final;
     free(savedValue);
     return SB_OK;
 }
 
-int sb_contains(const string_builder_union* sb, const char* toFind) {
-    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_4);
+int sb_contains(const string_builder_t* sb, const char* toFind) {
+    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_2);
     if (status != SB_OK) return 0;
 
-    int sb_len = sb->string_builder_t->count;
+    int sb_len = sb->count;
     int found = 0;
     int len = strlen(toFind);
     if (len > sb_len) return 0;
@@ -292,7 +306,7 @@ int sb_contains(const string_builder_union* sb, const char* toFind) {
         int innerHaveToBreak = 0;
 
         for (int b = 0; b < len && found != 1 && innerHaveToBreak != 1; b++) {
-            if (sb->string_builder_t->value[i + b] != toFind[b]) innerHaveToBreak = 1;
+            if (sb->value[i + b] != toFind[b]) innerHaveToBreak = 1;
             if (b == (len - 1) && innerHaveToBreak == 0) {
                 found = 1;
             }
@@ -301,21 +315,21 @@ int sb_contains(const string_builder_union* sb, const char* toFind) {
     return found;
 }
 
-sb_status sb_set_char_at(string_builder_union* sb, const char to_set, const int index) {
-    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_4);
+sb_status sb_set_char_at(string_builder_t* sb, const char to_set, const int index) {
+    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_2);
     if (status != SB_OK) return status;
-    if (index < 0 || index > sb->string_builder_t->count) return SB_OUT_OF_BOUNDS;
-    sb->string_builder_t->value[index] = to_set;
+    if (index < 0 || index > sb->count) return SB_OUT_OF_BOUNDS;
+    sb->value[index] = to_set;
     return SB_OK;
 }
 
-sb_status sb_to_upper_case(string_builder_union* sb) {
-    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_4);
+sb_status sb_to_upper_case(string_builder_t* sb) {
+    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_2);
     if (status != SB_OK) return status;
 
     int shift = 'a' - 'A';
-    int len = sb->string_builder_t->count;
-    char* value = sb->string_builder_t->value;
+    int len = sb->count;
+    char* value = sb->value;
 
     for (int i; i < len; i++) {
         char* current_char_p = &value[i];
@@ -326,13 +340,13 @@ sb_status sb_to_upper_case(string_builder_union* sb) {
     return SB_OK;
 }
 
-sb_status sb_to_lower_case(string_builder_union* sb) {
-    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_4);
+sb_status sb_to_lower_case(string_builder_t* sb) {
+    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_2);
     if (status != SB_OK) return status;
 
     int shift = 'a' - 'A';
-    int len = sb->string_builder_t->count;
-    char* value = sb->string_builder_t->value;
+    int len = sb->count;
+    char* value = sb->value;
 
     for (int i = 0; i < len; i++) {
         char* current_char_p = &value[i];
@@ -343,43 +357,41 @@ sb_status sb_to_lower_case(string_builder_union* sb) {
     return SB_OK;
 };
 
-sb_status sb_delete_char_at(string_builder_union* sb, const int index) {
-    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_4);
+sb_status sb_delete_char_at(string_builder_t* sb, const int index) {
+    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_2);
     if (status != SB_OK) return status;
 
-    int count = sb->string_builder_t->count;
+    int count = sb->count;
 
-    char* copy = sb->string_builder_t->value;
-    sb->string_builder_t->value = malloc(count - 1);
-    if (sb->string_builder_t->value == NULL) return SB_MEMORY_FAULT;
+    char* copy = sb->value;
+    sb->value = malloc(count - 1);
+    if (sb->value == NULL) return SB_MEMORY_FAULT;
 
-    char* value = sb->string_builder_t->value;
+    char* value = sb->value;
 
     int shift = 0;
     for (int i = 0; i < count; i++) {
         if (i == index) shift = 1;
         value[i] = copy[i + shift];
     }
-    sb->string_builder_t->count--;
+    sb->count--;
     free(copy);
     return SB_OK;
 }
 
-sb_status sb_delete(string_builder_union* sb, const int start, const int end) {
-    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_4);
+sb_status sb_delete(string_builder_t* sb, const int start, const int end) {
+    sb_status status = check_standard_errors(sb, false_malloc, sb_layer_2);
     if (status != SB_OK) return status;
 
-    if (start > end || start < 0 || end > sb->string_builder_t->count) return SB_OUT_OF_BOUNDS;
+    if (start > end || start < 0 || end > sb->count) return SB_OUT_OF_BOUNDS;
 
     int length_to_delete = end - start;
-    int count = sb->string_builder_t->count;
+    int count = sb->count;
     int final_length = count - length_to_delete;
 
-    printf("\n1 %u %u %u", count, length_to_delete, final_length);
-
-    char* saved_value = sb->string_builder_t->value;
-    sb->string_builder_t->value = malloc(final_length);
-    char* value = sb->string_builder_t->value;
+    char* saved_value = sb->value;
+    sb->value = malloc(final_length);
+    char* value = sb->value;
 
     int i = 0;
     while (i < start) {
@@ -396,7 +408,10 @@ sb_status sb_delete(string_builder_union* sb, const int start, const int end) {
         i++;
     }
 
-    sb->string_builder_t->count = final_length;
+    sb->count = final_length;
     free(saved_value);
     return SB_OK;
 }
+
+int sb_legth(const string_builder_t* sb);
+char* sb_copy_of_string_value(const string_builder_t* sb);
