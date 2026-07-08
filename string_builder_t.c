@@ -26,40 +26,40 @@ sb_status check_standard_errors(const string_builder_t* str, int afterMalloc, in
     return SB_OK;
 }
 
-sb_status ensure_capacity(string_builder_t* sb, int required_len){
-    if(sb->capacity <= 0) sb->capacity = 2;
+sb_status ensure_capacity(string_builder_t* sb, int required_len) {
+    if (sb->capacity <= 0) sb->capacity = 2;
 
-    while(sb->capacity < required_len){
-            int current_capacity = sb->capacity;
-            char* toKeep = sb->value;
-            sb->value = malloc(current_capacity + current_capacity/2);
-            if(sb->value == NULL) return SB_MEMORY_FAULT;
-            sb->capacity = current_capacity + current_capacity/2;
-            for(int i = 0; i<sb->count; i++){
-                sb->value[i] = toKeep[i];
-            }
-            free(toKeep);
-    } 
-      return SB_OK;
+    while (sb->capacity < required_len) {
+        int current_capacity = sb->capacity;
+        char* toKeep = sb->value;
+        sb->value = malloc(current_capacity + current_capacity / 2);
+        if (sb->value == NULL) return SB_MEMORY_FAULT;
+        sb->capacity = current_capacity + current_capacity / 2;
+        for (int i = 0; i < sb->count; i++) {
+            sb->value[i] = toKeep[i];
+        }
+        free(toKeep);
+    }
+    return SB_OK;
 }
 
 void sb_handle_status(sb_status status) {
+    if (status == SB_OK) return;
+    char* message = "";
     switch (status) {
         case SB_MEMORY_FAULT:
-            printf("\nMemory fault");
+            message = "Memory fault";
             break;
         case SB_IS_NULL:
-            printf("\nSB is NULL");
-            break;
-        case SB_OK:
-            printf("\nSB is OK");
+            message = "SB is NULL ";
             break;
         case SB_OUT_OF_BOUNDS:
-            printf("\nSB out of bounds");
+            message = "SB out of bounds ";
             break;
         default:
-            printf("\nUndefined status");
+            message = "Undefined status ";
             break;
+            fprintf(stderr, "\n%s", message);
     }
 }
 
@@ -100,7 +100,6 @@ string_builder_t* sb_allocate_new(const int capacity) {
     return new_sb;
 }
 
-
 string_builder_t* sb_create() { return sb_allocate_new(sb_basic_capacity); }
 
 string_builder_t* sb_from_string(const char* initialStr) {
@@ -132,15 +131,12 @@ string_builder_t* sb_substring(const string_builder_t* sb, const int start, cons
     sb_handle_status(status2);
     if (status2 == SB_MEMORY_FAULT) return NULL;
     for (int i = start; i < end; i++) {
-        to_return->value[i-start] = sb->value[i];
-        
+        to_return->value[i - start] = sb->value[i];
     }
 
     to_return->count = len;
     return to_return;
 }
-
-
 
 sb_status sb_print(const string_builder_t* sb) {
     sb_status status = check_standard_errors(sb, false_malloc, sb_layer_2);
@@ -225,18 +221,19 @@ sb_status sb_insert(string_builder_t* sb, const char* to_insert, const int start
     int final_lenght = length_initial + lenght_to_insert;
 
     sb_status status2 = ensure_capacity(sb, final_lenght);
-    if(status2 == SB_MEMORY_FAULT) return SB_MEMORY_FAULT;
+    if (status2 == SB_MEMORY_FAULT) return SB_MEMORY_FAULT;
 
     char* value = sb->value;
-    memmove(value + start_index + lenght_to_insert, value + start_index, length_initial - start_index);
+    memmove(value + start_index + lenght_to_insert, value + start_index,
+            length_initial - start_index);
     memcpy(value + start_index, to_insert, lenght_to_insert);
 
     sb->count = final_lenght;
     return SB_OK;
 }
 
-
-sb_status sb_replace(string_builder_t* sb, const char* toReplaceWith, const int start, const int end) {
+sb_status sb_replace(string_builder_t* sb, const char* toReplaceWith, const int start,
+                     const int end) {
     if (start > end || start < 0 || end > sb->count) return SB_OUT_OF_BOUNDS;
     sb_status status = check_standard_errors(sb, false_malloc, sb_layer_2);
     if (status != SB_OK) return 0;
@@ -247,7 +244,7 @@ sb_status sb_replace(string_builder_t* sb, const char* toReplaceWith, const int 
     int final_lenght = length_initial - lentgh_to_delete + lenght_to_insert;
 
     sb_status status2 = ensure_capacity(sb, final_lenght);
-    if(status2 == SB_MEMORY_FAULT) return SB_MEMORY_FAULT;
+    if (status2 == SB_MEMORY_FAULT) return SB_MEMORY_FAULT;
 
     char* value = sb->value;
 
@@ -268,11 +265,15 @@ sb_status sb_append(string_builder_t* sb, const char* to_append) {
     if (sb->value == NULL) return SB_MEMORY_FAULT;
     char* value = sb->value;
     for (int i = len_initial; i < len_final; i++) {
-            value[i] = to_append[i - len_initial];
-        }
+        value[i] = to_append[i - len_initial];
+    }
 
     sb->count = len_final;
     return SB_OK;
+}
+
+int sb_get_struct_size(){
+    return sizeof(string_builder_t);
 }
 
 int sb_contains(const string_builder_t* sb, const char* toFind) {
@@ -344,7 +345,7 @@ sb_status sb_delete_char_at(string_builder_t* sb, const int index) {
     if (status != SB_OK) return status;
     if (index < 0 || index > sb->count) return SB_OUT_OF_BOUNDS;
     char* value = sb->value;
-    memmove(value + index, value + index + 1, sb->count-index);
+    memmove(value + index, value + index + 1, sb->count - index);
     sb->count--;
     return SB_OK;
 }
@@ -359,7 +360,7 @@ sb_status sb_delete(string_builder_t* sb, const int start, const int end) {
     int final_length = count - length_to_delete;
 
     char* value = sb->value;
-    memmove(value+start, value+end, count-end);
+    memmove(value + start, value + end, count - end);
 
     sb->count = final_length;
     return SB_OK;
