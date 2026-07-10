@@ -59,13 +59,18 @@ void sb_handle_status(sb_status status) {
         default:
             message = "Undefined status ";
             break;
-            fprintf(stderr, "\n%s", message);
     }
+     fprintf(stderr, "\n%s", message);
 }
 
 int sb_legth(const string_builder_t* sb) { return sb->count; };
 
 char* sb_copy_of_string_value(const string_builder_t* sb) {
+    sb_status st = check_standard_errors(sb, false_malloc, 4);
+    if(st != SB_OK) {
+        sb_handle_status(st);
+        return "";
+    }
     int count = sb->count;
     char* to_return = malloc(count + 1);
     char* value = sb->value;
@@ -76,9 +81,12 @@ char* sb_copy_of_string_value(const string_builder_t* sb) {
     return to_return;
 }
 
-void sb_free(string_builder_t* sb) {
+sb_status sb_free(string_builder_t* sb) {
+    if (sb == NULL) return SB_IS_NULL;
+    if (sb->value == NULL) return SB_VALUE_IS_NULL;
     free(sb->value);
     free(sb);
+    return SB_OK;
 }
 
 string_builder_t* sb_allocate_new(const int capacity) {
@@ -87,7 +95,7 @@ string_builder_t* sb_allocate_new(const int capacity) {
     if (status1 != SB_OK) return NULL;
 
     new_sb = malloc(sizeof(string_builder_t));
-    sb_status status2 = check_standard_errors(new_sb, true_malloc, sb_layer_2);
+    sb_status status2 = check_standard_errors(new_sb, true_malloc, sb_layer_1);
     if (status2 != SB_OK) return NULL;
 
     new_sb->value = malloc(capacity);
@@ -275,6 +283,7 @@ sb_status sb_append(string_builder_t* sb, const char* to_append) {
 int sb_get_struct_size(){
     return sizeof(string_builder_t);
 }
+
 
 int sb_contains(const string_builder_t* sb, const char* toFind) {
     sb_status status = check_standard_errors(sb, false_malloc, sb_layer_2);

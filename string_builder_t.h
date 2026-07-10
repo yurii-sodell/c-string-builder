@@ -6,6 +6,7 @@ typedef enum {
     SB_OUT_OF_BOUNDS,
     SB_MEMORY_FAULT,
     SB_IS_NULL,
+    SB_VALUE_IS_NULL
 } sb_status;
 
 string_builder_t* sb_create();
@@ -34,4 +35,4 @@ int sb_is_value_equal(string_builder_t* sb1, string_builder_t* sb2);
 int sb_get_struct_size();
 
 void sb_handle_status(sb_status status);
-void sb_free(string_builder_t* sb);
+sb_status sb_free(string_builder_t* sb);
